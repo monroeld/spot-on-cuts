@@ -53,13 +53,20 @@ allData <- allData %>% mutate(Len = Chr_E - Chr_S)
 chr9reads <- allData %>% filter(Chr == "chr9")
 chr9reads <- unique(chr9reads$Name)
 
+chr13reads <- allData %>% filter(Chr == "chr13")
+chr13reads <- unique(chr13reads$Name)
+
+chr19reads <- allData %>% filter(Chr == "chr19")
+chr19reads <- unique(chr19reads$Name)
+
 chr22reads <- allData %>% filter(Chr == "chr22")
 chr22reads <- unique(chr22reads$Name)
 
-chr922union <- union(chr9reads, chr22reads)
+chrUnion <- unique(c(chr9reads, chr22reads, chr13reads, chr19reads))
 chr922int <- intersect(chr9reads, chr22reads)
 
-data922 <- allData %>% filter(Name %in% chr922union & Chr %in% c("chr9", "chr22"))
+dataUnion <- allData %>% filter(Name %in% chrUnion &
+                                  Chr %in% c("chr9", "chr13", "chr19", "chr22"))
 
 
 # 9 / 22 for BCR-ABL, 13 for FLT3 ITD, 19 for CEBPA
@@ -130,9 +137,43 @@ names(guideList) <- dates
 # Create columns for *all* cut sites
     # Later we can prune by which guides were present in which experiment
 
+# Search Chr_S and Chr_E for proximity to each cut site
 
 
+cutMatchS <- data.frame(sapply(1:nrow(cutSites), function(x) {
+  c(abs(dataUnion$Chr_S - cutSites$Location[x]))
+}))
+cutMatchE <- data.frame(sapply(1:nrow(cutSites), function(x) {
+  c(abs(dataUnion$Chr_E - cutSites$Location[x]))
+}))
 
+colnames(cutMatchS) <- cutSites$Name
+colnames(cutMatchE) <- cutSites$Name
+
+cutMatchS <- data.frame(lapply(cutMatchS, function(x) ifelse(x>50, 0, "S")), stringsAsFactors = F)
+cutMatchE <- data.frame(lapply(cutMatchE, function(x) ifelse(x>50, 0, "E")), stringsAsFactors = F)
+
+cutDataS <- cbind(dataUnion, cutMatchS)
+cutDataE <- cbind(dataUnion, cutMatchE)
+
+cutS <- melt(cutDataS, id.vars = c("Chr", "Chr_S", "Chr_E", "Name", "Score",
+                                     "Strand", "Date", "RefMat", "Len"),
+                measure.vars = cutSites$Name, variable.name = "Guide", value.name = "Cut")
+
+cutE <- melt(cutDataE, id.vars = c("Chr", "Chr_S", "Chr_E", "Name", "Score",
+                                     "Strand", "Date", "RefMat", "Len"),
+                measure.vars = cutSites$Name, variable.name = "Guide", value.name = "Cut")
+
+allCuts <- rbind(cutS, cutE) %>% filter(Cut != 0)
+
+rightCuts <- do.call(rbind, lapply(names(guideList), function(x) {
+        allCuts %>% filter(Date == x) %>%
+    filter(Guide %in% guideList[[match(x, names(guideList))]])
+}))
+
+numCuts <- rightCuts %>% group_by(Date, Guide) %>% summarise(Num = n())
+
+ggplot(numCuts) + geom_point(aes(x = Guide, y = Num, color = factor(Date)))
 
 
 # Find the number of unique reads within "window" of at least one cut site for BCR-ABL
