@@ -150,8 +150,10 @@ cutMatchE <- data.frame(sapply(1:nrow(cutSites), function(x) {
 colnames(cutMatchS) <- cutSites$Name
 colnames(cutMatchE) <- cutSites$Name
 
-cutMatchS <- data.frame(lapply(cutMatchS, function(x) ifelse(x>50, 0, "S")), stringsAsFactors = F)
-cutMatchE <- data.frame(lapply(cutMatchE, function(x) ifelse(x>50, 0, "E")), stringsAsFactors = F)
+cutMatchS <- data.frame(lapply(cutMatchS, function(x) ifelse(x>50, 0, "S")),
+                        stringsAsFactors = F)
+cutMatchE <- data.frame(lapply(cutMatchE, function(x) ifelse(x>50, 0, "E")),
+                        stringsAsFactors = F)
 
 cutDataS <- cbind(dataUnion, cutMatchS)
 cutDataE <- cbind(dataUnion, cutMatchE)
@@ -167,62 +169,19 @@ cutE <- melt(cutDataE, id.vars = c("Chr", "Chr_S", "Chr_E", "Name", "Score",
 allCuts <- rbind(cutS, cutE) %>% filter(Cut != 0)
 
 rightCuts <- do.call(rbind, lapply(names(guideList), function(x) {
-        allCuts %>% filter(Date == x) %>%
-    filter(Guide %in% guideList[[match(x, names(guideList))]])
-}))
+                            allCuts %>% filter(Date == x) %>%
+                            filter(Guide %in% guideList[[match(x, names(guideList))]])
+                    }))
 
 numCuts <- rightCuts %>% group_by(Date, Guide) %>% summarise(Num = n())
 
-ggplot(numCuts) + geom_point(aes(x = Guide, y = Num, color = factor(Date)))
+nReads <- allData %>% group_by(Date) %>% summarise(totReads = n())
 
+numCuts <- numCuts %>% group_by(Date) %>%
+  mutate(nReads = nReads$totReads[match(Date, nReads$Date)]) %>%
+  mutate(scaledReads = Num/sum(unique(nReads)))
 
-# Find the number of unique reads within "window" of at least one cut site for BCR-ABL
-# 
-# chr9Cuts <- chr922df %>% filter(Chr == "chr9") %>%
-#   mutate(ABL11 = ifelse((abs(133613086-Chr_E) < window) |
-#                           (abs(133613086-Chr_S) < window), 1, 0)) %>%
-#   mutate(ABL12 = ifelse((abs(133655785-Chr_E) < window) |
-#                           (abs(133655785-Chr_S) < window), 1, 0)) %>%
-#   mutate(ABL13 = ifelse((abs(133691503-Chr_E) < window) |
-#                           (abs(133691503-Chr_S) < window), 1, 0)) %>%
-#   mutate(ABL14 = ifelse((abs(133730289-Chr_E) < window) |
-#                           (abs(133730289-Chr_S) < window), 1, 0)) %>%
-#   mutate(ABL15 = ifelse((abs(133732446-Chr_E) < window) |
-#                           (abs(133732446-Chr_S) < window), 1, 0)) %>%
-#   mutate(anyABL = ifelse(ABL11 | ABL12 | ABL13 | ABL14 | ABL15, 1, 0)) %>%
-#   filter(anyABL == 1) %>% select(-Strand, -Score, -anyABL) %>%
-#   mutate(ABL11 = ifelse(ABL11 != 0,
-#                         ifelse(abs(133613086-Chr_E) > abs(133613086-Chr_S), "S", "E"), 0)) %>% 
-#   mutate(ABL12 = ifelse(ABL12 != 0,
-#                         ifelse(abs(133655785-Chr_E) > abs(133655785-Chr_S), "S", "E"), 0)) %>%
-#   mutate(ABL13 = ifelse(ABL13 != 0,
-#                         ifelse(abs(133691503-Chr_E) > abs(133691503-Chr_S), "S", "E"), 0)) %>% 
-#   mutate(ABL14 = ifelse(ABL14 != 0,
-#                         ifelse(abs(133730289-Chr_E) > abs(133730289-Chr_S), "S", "E"), 0)) %>%
-#   mutate(ABL15 = ifelse(ABL15 != 0,
-#                         ifelse(abs(133732446-Chr_E) > abs(133732446-Chr_S), "S", "E"), 0))
-
-
-ablCuts <- melt(chr9Cuts, id = c("Chr", "Chr_S", "Chr_E", "Name", "Len")) %>% filter(value != 0) %>%
-  group_by(variable) %>% summarise(n())
-
-
-chr22Cuts <- chr922df %>% filter(Chr == "chr22") %>%
-  mutate(BCR1 = ifelse((abs(23630389-Chr_E) < window) |
-                         (abs(23630389-Chr_S) < window), 1, 0)) %>%
-  mutate(BCR2 = ifelse((abs(23630060-Chr_E) < window) |
-                         (abs(23630060-Chr_S) < window), 1, 0)) %>%
-  mutate(anyBCR = ifelse(BCR1 | BCR2, 1, 0)) %>% filter(anyBCR == 1) %>%
-  select(-Strand, -Score, -anyBCR) %>%
-  mutate(BCR1 = ifelse(BCR1 != 0,
-                        ifelse(abs(23630389-Chr_E) > abs(23630389-Chr_S), "S", "E"), 0)) %>% 
-  mutate(BCR2 = ifelse(BCR2 != 0,
-                        ifelse(abs(23630060-Chr_E) > abs(23630060-Chr_S), "S", "E"), 0))
-
-bcrCuts <- melt(chr22Cuts, id = c("Chr", "Chr_S", "Chr_E", "Name", "Len")) %>% filter(value != 0) %>%
-  group_by(variable) %>% summarise(n())
-
-# length(unique(c(chr22Cuts$Name), c(chr9Cuts$Name)))
+ggplot(numCuts) + geom_point(aes(x = Guide, y = scaledReads, color = factor(Date)))
 
 
 ```
@@ -365,24 +324,3 @@ colnames(guideTable) <- c("Guide", "nCuts")
 write.csv(guideTable, paste0("guideTable_", refmat,".csv"))
 ```
 
-
-```{r Plot cumulative reads by chromosome}
-# Show read start/end locations along chromosomes
-chr9 <- filter(df, Chr == "chr9")
-ggplot(data = chr9) + geom_histogram(aes(x = Chr_E), fill = "red", alpha = 0.5, bins = 1000) + ggtitle("Chr9")
-
-chr22 <- filter(df, Chr == "chr22")
-ggplot(data = chr22) + geom_histogram(aes(x = Chr_S), fill = "dark green", alpha = 0.5, bins = 1000) + ggtitle("Chr22")
-
-# Show cumulative read fraction by chromosome
-chr9 <- chr9[order(chr9$Chr_E), ]
-chr9$Total <- (1:nrow(chr9))/(nrow(chr9))
-chr9CumReads <- ggplot(data = chr9) + geom_point(aes(x = Chr_E, y = Total), size = 0.25) + ggtitle("Chr9 Cumulative Reads (n=2933)")
-
-chr22 <- chr22[order(chr22$Chr_S), ]
-chr22$Total <- (1:nrow(chr22))/(nrow(chr22))
-chr22CumReads <- ggplot(data = chr22) + geom_point(aes(x = Chr_S, y = Total), size = 0.25) + ggtitle("Chr22 Cumulative Reads (n=956)")
-
-cumReads <- grid.arrange(chr9CumReads, chr22CumReads, nrow = 2)
-ggsave(paste0("cumulativeReads_", refmat, ".pdf"), cumReads, width = 8, height = 6)
-```
