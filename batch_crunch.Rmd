@@ -40,7 +40,7 @@ chr13lim <- 11440000
 chr19lim <- 58600000
 chr22lim <- 50820000
 
-# Length will be important later I guess...
+# Length will be important later
 allData <- allData %>% mutate(Len = Chr_E - Chr_S)
 ```
 
@@ -67,23 +67,6 @@ chr922int <- intersect(chr9reads, chr22reads)
 
 dataUnion <- allData %>% filter(Name %in% chrUnion &
                                   Chr %in% c("chr9", "chr13", "chr19", "chr22"))
-
-
-# 9 / 22 for BCR-ABL, 13 for FLT3 ITD, 19 for CEBPA
-# chr9reads <- unique(df$Name[df$Name %in% subset(df, Chr == "chr9")$Name])
-# chr22reads <- unique(df$Name[df$Name %in% subset(df, Chr == "chr22")$Name])
-# chr922reads <- union(chr9reads, chr22reads)
-# chr922df <- df %>% filter(Name %in% chr922reads) %>% filter(Chr %in% c("chr9", "chr22"))
-
-# chr922df has one read that maps to three locations on chr9, all with good scores.  Take the longest for this patient?
-# chr922df <- chr922df[-c(1, 3), ]
-# 
-# 
-# chr13reads <- unique(df$Name[df$Name %in% subset(df, Chr == "chr13")$Name])
-# chr13df <- df %>% filter(Name %in% chr13reads) %>% filter(Chr == "chr13")
-# 
-# chr19reads <- unique(df$Name[df$Name %in% subset(df, Chr == "chr19")$Name])
-# chr19df <- df %>% filter(Name %in% chr19reads) %>% filter(Chr == "chr19")
 
 ```
 
