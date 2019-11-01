@@ -9,36 +9,45 @@ library(gridExtra)
 library(reshape2)
 library(scales)
 library(rlist)
+library(readxl)
 ```
 
 
 ```{r Load csv}
 # Load data, extract metadata from names
 datasets <- list.files(path = ".", pattern = ".csv")
-split <- unlist(strsplit(datasets, "_"))
-dates <- grep("^[0-9]+$", split, value = TRUE)
-refmat <- split[grep("CRISPR", split)+1]
+splits <- unlist(strsplit(datasets, "_"))
+
+# Assign the easy things
+dates <- grep("^[0-9]+$", splits, value = TRUE)
+```
+
+```{r Load experiment list}
+expList <- read_excel("Experiment_List.xlsx")
 
 # Next up: read these csvs and append metadata as new column
 allData <- do.call(rbind, lapply(1:length(datasets), function(x) {
       working <- data.frame(read.csv(datasets[x], sep = ",", header = F, stringsAsFactors = F),
                             stringsAsFactors = F)
       working$Date <- dates[x]
-      working$RefMat <- refmat[x]
       working
       }
     ))
 
-colnames(allData)[1:6] <- c("Chr", "Chr_S", "Chr_E", "Name", "Score", "Strand")
+allData <- merge(allData, expList[, 1:3], by = "Date")
+
+colnames(allData)[1:7] <- c("Date", "Chr", "Chr_S", "Chr_E", "Name", "Score", "Strand")
 
 # Remove weird special characters that are somehow getting prepended onto each data set
 allData$Chr <- gsub("[^a-zA-Z0-9]", "", allData$Chr)
 
 # Chromosome lengths for plotting purposes
-chr9lim <- 138400000
-chr13lim <- 11440000
-chr19lim <- 58600000
-chr22lim <- 50820000
+chrlims <- c(247250000, 242952000, 199502000, 191274000, 180858000,
+             170900000, 158822000, 146275000, 140274000, 135375000,
+             134453000, 132350000, 114143000, 106369000, 100339000,
+             88828000, 78775000, 76118000, 63812000, 62436000,
+             46945000, 49692000, 154914000, 57773000) # Last two X, Y
+
 
 # Length will be important later
 allData <- allData %>% mutate(Len = Chr_E - Chr_S)
@@ -47,14 +56,21 @@ allData <- allData %>% mutate(Len = Chr_E - Chr_S)
 
 ```{r Get dataframe of bridging reads (same read name, both 9 and 22) }
 # Seems like names are unique.  Go off that assumption for now
-# first <- filter(allData, Date == "20190326")
-# second <- filter(allData, Date == dates[2])
 
 chr9reads <- allData %>% filter(Chr == "chr9")
 chr9reads <- unique(chr9reads$Name)
 
 chr13reads <- allData %>% filter(Chr == "chr13")
 chr13reads <- unique(chr13reads$Name)
+
+chr15reads <- allData %>% filter(Chr == "chr15")
+chr15reads <- unique(chr15reads$Name)
+
+chr16reads <- allData %>% filter(Chr == "chr16")
+chr16reads <- unique(chr16reads$Name)
+
+chr17reads <- allData %>% filter(Chr == "chr17")
+chr17reads <- unique(chr17reads$Name)
 
 chr19reads <- allData %>% filter(Chr == "chr19")
 chr19reads <- unique(chr19reads$Name)
@@ -66,52 +82,23 @@ chrUnion <- unique(c(chr9reads, chr22reads, chr13reads, chr19reads))
 chr922int <- intersect(chr9reads, chr22reads)
 
 dataUnion <- allData %>% filter(Name %in% chrUnion &
-                                  Chr %in% c("chr9", "chr13", "chr19", "chr22"))
+                                  Chr %in% c("chr9", "chr13", "chr15", "chr16",
+                                             "chr17", "chr19", "chr22"))
 
 ```
 
 
 ```{r Cut Sites}
 
-# Uses GRCh37.  Not all cut sites matter for all runs
-cutSites <- as.data.frame(t(data.frame(
-                       c("BCR1", "chr22", 23630389),
-                       c("BCR2", "chr22", 23630060),
-                       c("ABL11", "chr9", 133613086),
-                       c("ABL12", "chr9", 133655785),
-                       c("ABL13", "chr9", 133691503),
-                       c("ABL14", "chr9", 133730289),
-                       c("ABL15", "chr9", 133732446),
-                       c("CEBPA1", "chr19", 33786401),
-                       c("CEBPA2", "chr19", 33794671),
-                       c("FLT3F1", "chr13", 28609169),
-                       c("FLT3R1", "chr13", 28591129),
-                       c("FLT3R2", "chr13", 28590244),
-                       c("BCRB1", "chr22", 23630897),
-                       c("BCRB2", "chr22", 23630402),
-                       c("ABLA1", "chr9", 133730336),
-                       c("ABLA2", "chr9", 133734033)
-                       )), stringsAsFactors = F)
+# Uses hg19  Not all cut sites matter for all runs
+cutSites <- read_xlsx("Guides.xlsx")
+
+cutSites <- data.frame(cutSites[,1:3], stringsAsFactors = F)
 
 rownames(cutSites) <- NULL
-colnames(cutSites) <- c("Name", "Chr", "Location")
-cutSites$Location <- as.numeric(cutSites$Location)
+cutSites$hg19 <- as.numeric(cutSites$hg19)
 
 window = 50
-
-guideList <- list(
-                c("ABLA1", "ABLA2", "BCRB1", "BCRB2", "CEBPA1", "CEBPA2"),
-                c("BCR1", "BCR2", "ABL11", "ABL12", "ABL13", "ABL14", "ABL15"),
-                c("BCR1", "BCR2", "ABL11", "ABL12", "ABL13", "ABL14", "ABL15"),
-                c("BCR1", "BCR2", "ABL11", "ABL12", "ABL13", "ABL14", "ABL15",
-                        "FLT3F1", "FLT3R1", "FLT3R2", "CEBPA1", "CEBPA2"),
-                c("BCR1", "BCR2", "ABL11", "ABL12", "ABL13", "ABL14", "ABL15",
-                        "FLT3F1", "FLT3R1", "FLT3R2", "CEBPA1", "CEBPA2"),
-                c("BCR1", "BCR2", "ABL11", "ABL12", "ABL13", "ABL14", "ABL15",
-                        "FLT3F1", "FLT3R1", "FLT3R2", "CEBPA1", "CEBPA2")
-              )
-
-names(guideList) <- dates
 
 
 # Working up until this point
