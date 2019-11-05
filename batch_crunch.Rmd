@@ -10,6 +10,7 @@ library(reshape2)
 library(scales)
 library(rlist)
 library(readxl)
+library(rfast)
 ```
 
 
@@ -78,11 +79,10 @@ chr19reads <- unique(chr19reads$Name)
 chr22reads <- allData %>% filter(Chr == "chr22")
 chr22reads <- unique(chr22reads$Name)
 
-chrUnion <- unique(c(chr9reads, chr22reads, chr13reads, chr19reads))
 chr922int <- intersect(chr9reads, chr22reads)
+chr1517int <- intersect(chr15reads, chr17reads)
 
-dataUnion <- allData %>% filter(Name %in% chrUnion &
-                                  Chr %in% c("chr9", "chr13", "chr15", "chr16",
+dataUnion <- allData %>% filter(Chr %in% c("chr9", "chr13", "chr15", "chr16",
                                              "chr17", "chr19", "chr22"))
 
 ```
@@ -100,7 +100,10 @@ cutSites$hg19 <- as.numeric(cutSites$hg19)
 
 window = 50
 
+```
 
+
+```{r Crunch it!}
 # Working up until this point
 
 
@@ -109,31 +112,60 @@ window = 50
 
 # Search Chr_S and Chr_E for proximity to each cut site
 
+# Problem: cut sites may match locations on other chromosomes
+
+# For each guide
+  # Filter dataUnion by Chr
+  # Filter to dates in which that guide was used
+
+
+cutDists <- lapply(1:nrow(cutSites), function(x) {
+  working <- dataUnion %>% filter(Chr == cutSites$Chr[x])
+  dateList <- expList$Date[!(is.na(expList[, cutSites$Name[x]]))]
+  working2 <- filter(working, as.numeric(Date) %in% dateList)
+  working2[, paste0(cutSites$Name[x],"S")] <- c(abs(working2$Chr_S - cutSites$hg19[x]))
+  working2[, paste0(cutSites$Name[x],"E")] <- c(abs(working2$Chr_E - cutSites$hg19[x]))
+  working2
+  }
+)
+
+allDists <- join_all(cutDists, type = "full")
+
+allDists$rowMin <- sapply(1:nrow(allDists), function(x)
+              min(allDists[x, 11:ncol(allDists)], na.rm = T))
+
+withCuts <- filter(allDists, rowMin < 50)
+
+# Whew.  Works up to here
 
 cutMatchS <- data.frame(sapply(1:nrow(cutSites), function(x) {
-  c(abs(dataUnion$Chr_S - cutSites$Location[x]))
+  c(abs(dataUnion$Chr_S - cutSites$hg19[x]))
 }))
 cutMatchE <- data.frame(sapply(1:nrow(cutSites), function(x) {
-  c(abs(dataUnion$Chr_E - cutSites$Location[x]))
+  c(abs(dataUnion$Chr_E - cutSites$hg19[x]))
 }))
 
 colnames(cutMatchS) <- cutSites$Name
 colnames(cutMatchE) <- cutSites$Name
 
-cutMatchS <- data.frame(lapply(cutMatchS, function(x) ifelse(x>50, 0, "S")),
+cutMatchS <- data.frame(lapply(cutMatchS, function(x) ifelse(x>50, 0, 1)),
                         stringsAsFactors = F)
-cutMatchE <- data.frame(lapply(cutMatchE, function(x) ifelse(x>50, 0, "E")),
+cutMatchE <- data.frame(lapply(cutMatchE, function(x) ifelse(x>50, 0, 1)),
                         stringsAsFactors = F)
+
+colSums(cutMatchS)
 
 cutDataS <- cbind(dataUnion, cutMatchS)
 cutDataE <- cbind(dataUnion, cutMatchE)
 
+
+
 cutS <- melt(cutDataS, id.vars = c("Chr", "Chr_S", "Chr_E", "Name", "Score",
-                                     "Strand", "Date", "RefMat", "Len"),
+                                     "Strand", "Date", "Sample", "Len"),
                 measure.vars = cutSites$Name, variable.name = "Guide", value.name = "Cut")
 
 cutE <- melt(cutDataE, id.vars = c("Chr", "Chr_S", "Chr_E", "Name", "Score",
-                                     "Strand", "Date", "RefMat", "Len"),
+                                     "Strand", "Date", "Sample", "Len"),
                 measure.vars = cutSites$Name, variable.name = "Guide", value.name = "Cut")
 
 allCuts <- rbind(cutS, cutE) %>% filter(Cut != 0)
