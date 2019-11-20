@@ -10,7 +10,6 @@ library(reshape2)
 library(scales)
 library(rlist)
 library(readxl)
-library(rfast)
 ```
 
 
@@ -104,8 +103,6 @@ window = 50
 
 
 ```{r Crunch it!}
-# Working up until this point
-
 
 # Create columns for *all* cut sites
     # Later we can prune by which guides were present in which experiment
@@ -187,7 +184,7 @@ testing <- bind_rows(lapply(1:nrow(rois), function(x) {
 working <- distinct(testing)
 inGenes <- filter(working, inRoi == 1)
 
-# Match inRoi to genes.  Not working properly...
+# Match inRoi to genes
 
 inGenes$endint <- sapply(1:nrow(inGenes), function(x) {
   endint = intersect(which(inGenes$Chr_E[x] >= rois$Start), which(inGenes$Chr_E[x] <= rois$End))
@@ -207,13 +204,21 @@ inGenes$both <- sapply(1:nrow(inGenes), function(x) {
   both = ifelse(length(both) > 1 && 0 %in% both, sum(both), both)
 })
 
+inGenes <- inGenes %>% mutate(Gene = pmax(startint, endint, both, na.rm = T)) %>%
+  mutate(Gene = rois$Gene[Gene]) %>% select(-startint, -endint, -both, -inRoi)
 
+# Works until here
 
-  ifelse(inGene$Chr[x] == rois$Chr)
-  max(rois$Gene[startint], rois$Gene[endint], na.rm = T)
+expGenes <- lapply(1:nrow(expList), function(x) {
+  test <- colnames(expList)[!is.na(expList[x, ])]
+  test <- test[5:length(test)]
+  test2 <- substr(test, 0, 3)
+  rois$Gene[match(unique(test2),substr(rois$Gene, 0, 3))]
+})
+names(expGenes) <- expList$Date
 
-start = which(inGenes$Chr_E[1] >= rois$Start)
-end = which(inGenes$Chr_E[1] <= rois$End)
+test <- inGenes %>% group_by(Date) %>% filter(!(Gene %in% expGenes))
+
 
 # By each date, remove 
 
