@@ -217,24 +217,26 @@ inGenes <- bind_rows(lapply(1:nrow(rois), function(x) {
 # inGenes <- inGenes %>% mutate(Gene = pmax(startint, endint, both, na.rm = T)) %>%
 #   mutate(Gene = rois$Gene[Gene]) %>% select(-startint, -endint, -both, -inRoi)
 # 
-# 
-# expGenes <- c(sapply(1:nrow(expList), function(x) {
-#   test <- colnames(expList)[!is.na(expList[x, ])]
-#   test <- test[5:length(test)]
-#   test2 <- substr(test, 0, 3)
-#   rois$Gene[match(unique(test2),substr(rois$Gene, 0, 3))]
-# }))
-# 
-# expGenes <- data.frame(cbind(unlist(expGenes),
-#                              rep(expList$Date, times = lengths(expGenes))),
-#                        stringsAsFactors = F)
-# colnames(expGenes) <- c("Gene", "Date")
-# 
-# test2 <- inner_join(inGenes, expGenes) # Gene/Date combos for which there are reads
 
 # Works until here
 
-test3 <- test2 %>% group_by(Date) %>% dplyr::summarise(n())
+expGenes <- c(sapply(1:nrow(expList), function(x) {
+  test <- colnames(expList)[!is.na(expList[x, ])]
+  test <- test[5:length(test)]
+  test2 <- substr(test, 0, 3)
+  rois$Gene[match(unique(test2),substr(rois$Gene, 0, 3))]
+}))
+
+expGenes <- data.frame(cbind(unlist(expGenes),
+                             rep(expList$Date, times = lengths(expGenes))),
+                       stringsAsFactors = F)
+colnames(expGenes) <- c("Gene", "Date")
+
+# inGenes has reads in rois.  expGenes lists gene targets by date
+  # anti_join removes combos of expGenes from inGenes.  Ta-da!
+offTarget <- anti_join(inGenes, expGenes, by = c("Date", "Gene"))
+
+test3 <- offTarget %>% group_by(Gene, Date) %>% dplyr::summarise(n())
 test4 <- allData %>% group_by(Date) %>% dplyr::summarise(reads = n(), totLen = sum(Len))
 test3$reads <- filter(test4, Date %in% test3$Date)$reads
 
