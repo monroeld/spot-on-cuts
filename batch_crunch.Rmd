@@ -169,21 +169,41 @@ test3 <- test %>% group_by(Date, Device) %>% dplyr::summarise(n())
 
 
 ```{r Check cuts from other guides on regions of interest}
+# There's probably a way of doing all this stuff with `join`
+  # See near the bottom of this chunk...
+
 # Region of interest dataframe, then iterate over guides to see when they're cutting there
 
+inGenes <- bind_rows(lapply(1:nrow(rois), function(x) {
+  
+            working <- allData %>% filter(Chr == rois$Chr[x])
+              
+              # Could also be intersection of:
+                # Rows of rois where Chr_S >= start
+                # Rows of rois where Chr_E <= end
+              # and other two possibilities
 
-testing <- bind_rows(lapply(1:nrow(rois), function(x) {
-            working <- allData %>% filter(Chr == rois$Chr[x]) %>%
-              mutate(inRoi = ifelse((Chr_S >= rois$Start[x] & Chr_S <= rois$End[x]) |
-                                      (Chr_E >= rois$Start[x] & Chr_E <= rois$End[x]) |
-                                      (Chr_S <= rois$Start[x] & Chr_E >= rois$End[x]), 1, 0))
+            test <- intersect(which(working$Chr_S >= rois$Start[x]),
+                            which(working$Chr_S <= rois$End[x]))
+            test2 <- intersect(which(working$Chr_E >= rois$Start[x]),
+                            which(working$Chr_E <= rois$End[x]))
+            test3 <- intersect(which(working$Chr_S <= rois$Start[x]),
+                            which(working$Chr_E >= rois$End[x]))
+            
+            return(working[unique(c(test, test2, test3)), ])
+              # 
+              # 
+              # mutate(inRoi = ifelse((Chr_S >= rois$Start[x] & Chr_S <= rois$End[x]) |
+              #                         (Chr_E >= rois$Start[x] & Chr_E <= rois$End[x]) |
+              #                         (Chr_S <= rois$Start[x] & Chr_E >= rois$End[x]), 1, 0))
       }
   ))
 
-working <- distinct(testing)
-inGenes <- filter(working, inRoi == 1)
+# working <- distinct(testing)
 
 # Match inRoi to genes
+
+  # Look for chromosomes, 
 
 inGenes$endint <- sapply(1:nrow(inGenes), function(x) {
   endint = intersect(which(inGenes$Chr_E[x] >= rois$Start), which(inGenes$Chr_E[x] <= rois$End))
