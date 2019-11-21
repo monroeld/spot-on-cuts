@@ -13,7 +13,7 @@ library(readxl)
 ```
 
 
-```{r Load csv}
+```{r Load csvs, xls}
 # Load data, extract metadata from names
 datasets <- list.files(path = ".", pattern = ".csv")
 splits <- unlist(strsplit(datasets, "_"))
@@ -175,71 +175,62 @@ test3 <- test %>% group_by(Date, Device) %>% dplyr::summarise(n())
 # Region of interest dataframe, then iterate over guides to see when they're cutting there
 
 inGenes <- bind_rows(lapply(1:nrow(rois), function(x) {
-  
             working <- allData %>% filter(Chr == rois$Chr[x])
-              
-              # Could also be intersection of:
-                # Rows of rois where Chr_S >= start
-                # Rows of rois where Chr_E <= end
-              # and other two possibilities
-
+            
+            # Start of read in roi
             test <- intersect(which(working$Chr_S >= rois$Start[x]),
                             which(working$Chr_S <= rois$End[x]))
+            # End of read in roi
             test2 <- intersect(which(working$Chr_E >= rois$Start[x]),
                             which(working$Chr_E <= rois$End[x]))
+            # Start and end span roi (more rare)
             test3 <- intersect(which(working$Chr_S <= rois$Start[x]),
                             which(working$Chr_E >= rois$End[x]))
             
+            # Duh.  Saves a lot of painful matching later
+            working$Gene <- rois$Gene[x]
+            
+            # Less warning-prone than `union` with empty sets
             return(working[unique(c(test, test2, test3)), ])
-              # 
-              # 
-              # mutate(inRoi = ifelse((Chr_S >= rois$Start[x] & Chr_S <= rois$End[x]) |
-              #                         (Chr_E >= rois$Start[x] & Chr_E <= rois$End[x]) |
-              #                         (Chr_S <= rois$Start[x] & Chr_E >= rois$End[x]), 1, 0))
       }
   ))
 
-# working <- distinct(testing)
 
-# Match inRoi to genes
-
-  # Look for chromosomes, 
-
-inGenes$endint <- sapply(1:nrow(inGenes), function(x) {
-  endint = intersect(which(inGenes$Chr_E[x] >= rois$Start), which(inGenes$Chr_E[x] <= rois$End))
-  endint = ifelse(inGenes$Chr[x] == rois$Chr[endint], endint, 0)
-  endint = ifelse(length(endint) > 1 && 0 %in% endint, sum(endint), endint)
-})
-
-inGenes$startint <- sapply(1:nrow(inGenes), function(x) {
-  startint = intersect(which(inGenes$Chr_S[x] >= rois$Start), which(inGenes$Chr_S[x] <= rois$End))
-  startint = ifelse(inGenes$Chr[x] == rois$Chr[startint], startint, 0)
-  startint = ifelse(length(startint) > 1 && 0 %in% startint, sum(startint), startint)
-})
-
-inGenes$both <- sapply(1:nrow(inGenes), function(x) {
-  both = intersect(which(inGenes$Chr_S[x] <= rois$Start), which(inGenes$Chr_E[x] >= rois$End))
-  both = ifelse(inGenes$Chr[x] == rois$Chr[both], both, 0)
-  both = ifelse(length(both) > 1 && 0 %in% both, sum(both), both)
-})
-
-inGenes <- inGenes %>% mutate(Gene = pmax(startint, endint, both, na.rm = T)) %>%
-  mutate(Gene = rois$Gene[Gene]) %>% select(-startint, -endint, -both, -inRoi)
-
-
-expGenes <- c(sapply(1:nrow(expList), function(x) {
-  test <- colnames(expList)[!is.na(expList[x, ])]
-  test <- test[5:length(test)]
-  test2 <- substr(test, 0, 3)
-  rois$Gene[match(unique(test2),substr(rois$Gene, 0, 3))]
-}))
-
-expGenes <- data.frame(cbind(unlist(expGenes),
-                             rep(expList$Date, times = lengths(expGenes))),
-                       stringsAsFactors = F)
-colnames(expGenes) <- c("Gene", "Date")
-
-test2 <- inner_join(inGenes, expGenes) # Gene/Date combos for which there are reads
+# inGenes$endint <- sapply(1:nrow(inGenes), function(x) {
+#   endint = intersect(which(inGenes$Chr_E[x] >= rois$Start), which(inGenes$Chr_E[x] <= rois$End))
+#   endint = ifelse(inGenes$Chr[x] == rois$Chr[endint], endint, 0)
+#   endint = ifelse(length(endint) > 1 && 0 %in% endint, sum(endint), endint)
+# })
+# 
+# inGenes$startint <- sapply(1:nrow(inGenes), function(x) {
+#   startint = intersect(which(inGenes$Chr_S[x] >= rois$Start), which(inGenes$Chr_S[x] <= rois$End))
+#   startint = ifelse(inGenes$Chr[x] == rois$Chr[startint], startint, 0)
+#   startint = ifelse(length(startint) > 1 && 0 %in% startint, sum(startint), startint)
+# })
+# 
+# inGenes$both <- sapply(1:nrow(inGenes), function(x) {
+#   both = intersect(which(inGenes$Chr_S[x] <= rois$Start), which(inGenes$Chr_E[x] >= rois$End))
+#   both = ifelse(inGenes$Chr[x] == rois$Chr[both], both, 0)
+#   both = ifelse(length(both) > 1 && 0 %in% both, sum(both), both)
+# })
+# 
+# inGenes <- inGenes %>% mutate(Gene = pmax(startint, endint, both, na.rm = T)) %>%
+#   mutate(Gene = rois$Gene[Gene]) %>% select(-startint, -endint, -both, -inRoi)
+# 
+# 
+# expGenes <- c(sapply(1:nrow(expList), function(x) {
+#   test <- colnames(expList)[!is.na(expList[x, ])]
+#   test <- test[5:length(test)]
+#   test2 <- substr(test, 0, 3)
+#   rois$Gene[match(unique(test2),substr(rois$Gene, 0, 3))]
+# }))
+# 
+# expGenes <- data.frame(cbind(unlist(expGenes),
+#                              rep(expList$Date, times = lengths(expGenes))),
+#                        stringsAsFactors = F)
+# colnames(expGenes) <- c("Gene", "Date")
+# 
+# test2 <- inner_join(inGenes, expGenes) # Gene/Date combos for which there are reads
 
 # Works until here
 
