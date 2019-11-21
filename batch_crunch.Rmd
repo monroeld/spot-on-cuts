@@ -18,19 +18,31 @@ library(readxl)
 datasets <- list.files(path = ".", pattern = ".csv")
 splits <- unlist(strsplit(datasets, "_"))
 
+# Load supplementary files
+expList <- read_excel("Experiment_List.xlsx")
+
+  # Uses hg19  Not all cut sites matter for all runs
+cutSites <- read_xlsx("Guides.xlsx")
+cutSites <- data.frame(cutSites[,1:3], stringsAsFactors = F)
+rownames(cutSites) <- NULL
+cutSites$hg19 <- as.numeric(cutSites$hg19)
+window = 50
+
+rois <- read_xlsx("Regions_of_Interest.xlsx")
+
+
 # Assign the easy things
 dates <- grep("^[0-9]+$", splits, value = TRUE)
 ```
 
 ```{r Load experiment list}
-expList <- read_excel("Experiment_List.xlsx")
 
 # Next up: read these csvs and append metadata as new column
 allData <- do.call(rbind, lapply(1:length(datasets), function(x) {
       working <- data.frame(read.csv(datasets[x], sep = ",", header = F, stringsAsFactors = F),
                             stringsAsFactors = F)
       working$Date <- dates[x]
-      working
+      return(working)
       }
     ))
 
@@ -46,10 +58,12 @@ chrlims <- c(247250000, 242952000, 199502000, 191274000, 180858000,
              170900000, 158822000, 146275000, 140274000, 135375000,
              134453000, 132350000, 114143000, 106369000, 100339000,
              88828000, 78775000, 76118000, 63812000, 62436000,
-             46945000, 49692000, 154914000, 57773000) # Last two X, Y
+             46945000, 49692000, 154914000, 57773000)
+# Last two X, Y.  Need to add M at some point
 
 
 # Length will be important later
+  # Semi-arbitrarily filter at 50
 allData <- allData %>% mutate(Len = Chr_E - Chr_S) %>% filter(Score >= 50)
 ```
 
@@ -83,21 +97,6 @@ chr1517int <- intersect(chr15reads, chr17reads)
 
 dataUnion <- allData %>% filter(Chr %in% c("chr9", "chr13", "chr15", "chr16",
                                              "chr17", "chr19", "chr22"))
-
-```
-
-
-```{r Cut Sites}
-
-# Uses hg19  Not all cut sites matter for all runs
-cutSites <- read_xlsx("Guides.xlsx")
-
-cutSites <- data.frame(cutSites[,1:3], stringsAsFactors = F)
-
-rownames(cutSites) <- NULL
-cutSites$hg19 <- as.numeric(cutSites$hg19)
-
-window = 50
 
 ```
 
@@ -171,7 +170,7 @@ test3 <- test %>% group_by(Date, Device) %>% dplyr::summarise(n())
 
 ```{r Check cuts from other guides on regions of interest}
 # Region of interest dataframe, then iterate over guides to see when they're cutting there
-rois <- read_xlsx("Regions_of_Interest.xlsx")
+
 
 testing <- bind_rows(lapply(1:nrow(rois), function(x) {
             working <- allData %>% filter(Chr == rois$Chr[x]) %>%
