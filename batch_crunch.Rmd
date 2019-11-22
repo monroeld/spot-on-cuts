@@ -258,7 +258,7 @@ CBFBmap <- ggplot(data = CBFB) +
   geom_vline(aes(xintercept = 67111989), linetype = "dashed") +
   geom_vline(aes(xintercept = 67111940), linetype = "dashed") +
   ggtitle("CBFB off-target cuts") +
-  scale_shape_manual(values = c(0:2, 4:6)) +
+  scale_shape_manual(values = c(0:2, 4:6, 15)) +
   xlab("Chr coordinates")
 
 MYHmap <- ggplot(data = MYH) +
@@ -270,7 +270,7 @@ MYHmap <- ggplot(data = MYH) +
   geom_vline(aes(xintercept = 15817006), linetype = "dashed") +
   geom_vline(aes(xintercept = 15818634), linetype = "dashed") +
   ggtitle("MYH off-target cuts") +
-  scale_shape_manual(values = c(0:2, 4:6)) +
+  scale_shape_manual(values = c(0:2, 4:6, 15)) +
   xlab("Chr coordinates")
 
 
@@ -283,7 +283,7 @@ PMLmap <- ggplot(data = PML) +
   geom_vline(aes(xintercept = 74324389), linetype = "dashed") +
   geom_vline(aes(xintercept = 74304134), linetype = "dashed") +
   ggtitle("PML off-target cuts") +
-  scale_shape_manual(values = c(0:2, 4:6)) +
+  scale_shape_manual(values = c(0:2, 4:6, 15)) +
   xlab("Chr coordinates")
 
 
@@ -294,13 +294,13 @@ RARAmap <- ggplot(data = RARA) +
   geom_vline(aes(xintercept = 38505209), linetype = "dashed") +
   geom_vline(aes(xintercept = 38511865), linetype = "dashed") +
   ggtitle("RARA off-target cuts") +
-  scale_shape_manual(values = c(0:2, 4:6)) +
+  scale_shape_manual(values = c(0:2, 4:6, 15)) +
   xlab("Chr coordinates")
 
 
 export <- arrangeGrob(CBFBmap, MYHmap, PMLmap, RARAmap, nrow = 2, ncol = 2)
 
-ggsave("offTargets.pdf", export, width = 11, height = 6)
+ggsave("offTargets.pdf", export, width = 11, height = 10)
 
 test3 <- offTarget %>% group_by(Gene, Date) %>% dplyr::summarise(n())
 test4 <- allData %>% group_by(Date) %>% dplyr::summarise(reads = n(), totLen = sum(Len))
