@@ -73,39 +73,6 @@ allData <- allData %>% mutate(Len = Chr_E - Chr_S) %>% filter(Score >= 50)
 ```
 
 
-```{r Get dataframe of bridging reads (same read name, both 9 and 22) }
-# Seems like names are unique.  Go off that assumption for now
-
-chr9reads <- allData %>% filter(Chr == "chr9")
-chr9reads <- unique(chr9reads$Name)
-
-chr13reads <- allData %>% filter(Chr == "chr13")
-chr13reads <- unique(chr13reads$Name)
-
-chr15reads <- allData %>% filter(Chr == "chr15")
-chr15reads <- unique(chr15reads$Name)
-
-chr16reads <- allData %>% filter(Chr == "chr16")
-chr16reads <- unique(chr16reads$Name)
-
-chr17reads <- allData %>% filter(Chr == "chr17")
-chr17reads <- unique(chr17reads$Name)
-
-chr19reads <- allData %>% filter(Chr == "chr19")
-chr19reads <- unique(chr19reads$Name)
-
-chr22reads <- allData %>% filter(Chr == "chr22")
-chr22reads <- unique(chr22reads$Name)
-
-chr922int <- intersect(chr9reads, chr22reads)
-chr1517int <- intersect(chr15reads, chr17reads)
-
-dataUnion <- allData %>% filter(Chr %in% c("chr9", "chr13", "chr15", "chr16",
-                                             "chr17", "chr19", "chr22"))
-
-```
-
-
 ```{r Crunch it!}
 
 # Create columns for *all* cut sites
@@ -145,8 +112,10 @@ withCuts$cutGuide <- sapply(1:nrow(withCuts), function(x)
         colnames(withCuts[x, 11:76])[match(withCuts$rowMin[x], withCuts[x, 11:76])])
 
 
-whichCuts <- withCuts %>% select(c("Date", "Chr", "Chr_S", "Chr_E", "Name", "Score", "Strand",
-                                   "Sample", "Device", "Len", "cutGuide")) %>% filter(Score >= 50)
+whichCuts <- withCuts %>%
+  select(c("Date", "Chr", "Chr_S", "Chr_E", "Name",
+           "Score", "Strand","Sample", "Device", "Len", "cutGuide")) %>%
+  filter(Score >= 50)
 
 
 # Collapse by start or end first
