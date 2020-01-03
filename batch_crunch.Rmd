@@ -58,14 +58,12 @@ colnames(allData)[1:7] <- c("Date", "Chr", "Chr_S", "Chr_E", "Name", "Score", "S
 # Remove weird special characters that are somehow getting prepended onto each data set
 allData$Chr <- gsub("[^a-zA-Z0-9]", "", allData$Chr)
 
-# Chromosome lengths for plotting purposes
+# Chromosome lengths for plotting purposes.  Last three X, Y, M
 chrlims <- c(247250000, 242952000, 199502000, 191274000, 180858000,
              170900000, 158822000, 146275000, 140274000, 135375000,
              134453000, 132350000, 114143000, 106369000, 100339000,
              88828000, 78775000, 76118000, 63812000, 62436000,
              46945000, 49692000, 154914000, 57773000, 16569)
-# Last three X, Y, M.  Need to add M at some point
-
 
 # Length will be important later
   # Semi-arbitrarily filter at 50
@@ -80,12 +78,9 @@ allData <- allData %>% mutate(Len = Chr_E - Chr_S) %>% filter(Score >= 50)
 
 # Search Chr_S and Chr_E for proximity to each cut site
 
-# Problem: cut sites may match locations on other chromosomes
-
 # For each guide
   # Filter dataUnion by Chr
   # Filter to dates in which that guide was used
-
 
 cutDists <- lapply(1:nrow(cutSites), function(x) {
   working <- allData %>% filter(Chr == cutSites$Chr[x])
@@ -106,20 +101,15 @@ allDists$rowMin <- sapply(1:nrow(allDists), function(x)
 
 withCuts <- filter(allDists, rowMin < 50)
 
-# Whew.  Works up to here
-
 withCuts$cutGuide <- sapply(1:nrow(withCuts), function(x)
         colnames(withCuts[x, 11:76])[match(withCuts$rowMin[x], withCuts[x, 11:76])])
 
 
 whichCuts <- withCuts %>%
   select(c("Date", "Chr", "Chr_S", "Chr_E", "Name",
-           "Score", "Strand","Sample", "Device", "Len", "cutGuide")) %>%
-  filter(Score >= 50)
-
+           "Score", "Strand","Sample", "Device", "Len", "cutGuide"))
 
 # Collapse by start or end first
-
 test <- whichCuts
 test <- test %>% mutate(End = substr(cutGuide, nchar(cutGuide), nchar(cutGuide))) %>%
   mutate(cutGuide = substr(cutGuide, 0, nchar(cutGuide)-1))
@@ -127,17 +117,6 @@ test <- test %>% mutate(End = substr(cutGuide, nchar(cutGuide), nchar(cutGuide))
 
 test2 <- test %>% group_by(Date, cutGuide, Device) %>% dplyr::summarise(n())
 test3 <- test %>% group_by(Date, Device) %>% dplyr::summarise(n())
-
-
-# numCuts <- rightCuts %>% group_by(Date, Guide) %>% summarise(Num = n())
-# 
-# nReads <- allData %>% group_by(Date) %>% summarise(totReads = n())
-# 
-# numCuts <- numCuts %>% group_by(Date) %>%
-#   mutate(nReads = nReads$totReads[match(Date, nReads$Date)]) %>%
-#   mutate(scaledReads = Num/sum(unique(nReads)))
-# 
-# ggplot(numCuts) + geom_point(aes(x = Guide, y = scaledReads, color = factor(Date)))
 
 ```
 
@@ -173,6 +152,7 @@ inGenes <- bind_rows(lapply(1:nrow(rois), function(x) {
 expGenes <- c(sapply(1:nrow(expList), function(x) {
   allGenes <- colnames(expList)[!is.na(expList[x, ])]
   allGenes <- allGenes[5:length(allGenes)]
+  # Gene names are annoying to regex out of the excel file...
   junction <- ifelse(regexpr("([0-9][.,_])|([a-zA-Z][.,_])", allGenes) > 0,
                   regexpr("([0-9][.,_])|([a-zA-Z][.,_])", allGenes),
                   regexpr("[0-9][a-zA-Z]|([0-9][a-zA-Z])", allGenes))
@@ -190,71 +170,68 @@ colnames(expGenes) <- c("Gene", "Date")
   # anti_join removes combos of expGenes from inGenes.  Ta-da!
 offTarget <- anti_join(inGenes, expGenes, by = c("Date", "Gene"))
 
-
-PML = filter(offTarget, Gene == "PML")
-PML$num = 1:nrow(PML)
-
-RARA = filter(offTarget, Gene == "RARA")
-RARA$num = 1:nrow(RARA)
-
-CBFB = filter(offTarget, Gene == "CBFB")
-CBFB$num = 1:nrow(CBFB)
-
-MYH = filter(offTarget, Gene == "MYH11")
-MYH$num = 1:nrow(MYH)
+# Example plot: find off-target reads from guides ordered in Nov
+# PML = filter(offTarget, Gene == "PML")
+# PML$num = 1:nrow(PML)
 # 
-# RARA = filter(test, Gene == "RARA")
-
-CBFBmap <- ggplot(data = CBFB) +
-  geom_point(aes(x = Chr_S, y = num, shape = factor(Date)), size = 3.5, color = "blue") +
-  geom_point(aes(x = Chr_E, y = num, shape = factor(Date)), size = 3.5, color = "red") +
-  xlim(c(rois$Start[rois$Gene == "CBFB"], rois$End[rois$Gene == "CBFB"])) +
-  geom_vline(aes(xintercept = 67111989), linetype = "dashed") +
-  geom_vline(aes(xintercept = 67111940), linetype = "dashed") +
-  ggtitle("CBFB off-target cuts") +
-  scale_shape_manual(values = c(0:2, 4:6, 15)) +
-  xlab("Chr coordinates")
-
-MYHmap <- ggplot(data = MYH) +
-  geom_point(aes(x = Chr_S, y = num, shape = factor(Date)), size = 3.5, color = "blue") +
-  geom_point(aes(x = Chr_E, y = num, shape = factor(Date)), size = 3.5, color = "red") +
-  xlim(c(rois$Start[rois$Gene == "MYH11"], rois$End[rois$Gene == "MYH11"])) +
-  geom_vline(aes(xintercept = 15808795), linetype = "dashed") +
-  geom_vline(aes(xintercept = 15814171), linetype = "dashed") +
-  geom_vline(aes(xintercept = 15817006), linetype = "dashed") +
-  geom_vline(aes(xintercept = 15818634), linetype = "dashed") +
-  ggtitle("MYH off-target cuts") +
-  scale_shape_manual(values = c(0:2, 4:6, 15)) +
-  xlab("Chr coordinates")
-
-
-PMLmap <- ggplot(data = PML) +
-  geom_point(aes(x = Chr_S, y = num, shape = factor(Date)), size = 3.5, color = "blue") +
-  geom_point(aes(x = Chr_E, y = num, shape = factor(Date)), size = 3.5, color = "red") +
-  xlim(c(rois$Start[rois$Gene == "PML"], rois$End[rois$Gene == "PML"])) +
-  geom_vline(aes(xintercept = 74322670), linetype = "dashed") +
-  geom_vline(aes(xintercept = 74305671), linetype = "dashed") +
-  geom_vline(aes(xintercept = 74324389), linetype = "dashed") +
-  geom_vline(aes(xintercept = 74304134), linetype = "dashed") +
-  ggtitle("PML off-target cuts") +
-  scale_shape_manual(values = c(0:2, 4:6, 15)) +
-  xlab("Chr coordinates")
-
-
-RARAmap <- ggplot(data = RARA) +
-  geom_point(aes(x = Chr_S, y = num, shape = factor(Date)), size = 3.5, color = "blue") +
-  geom_point(aes(x = Chr_E, y = num, shape = factor(Date)), size = 3.5, color = "red") +
-  xlim(c(rois$Start[rois$Gene == "RARA"], rois$End[rois$Gene == "RARA"])) +
-  geom_vline(aes(xintercept = 38505209), linetype = "dashed") +
-  geom_vline(aes(xintercept = 38511865), linetype = "dashed") +
-  ggtitle("RARA off-target cuts") +
-  scale_shape_manual(values = c(0:2, 4:6, 15)) +
-  xlab("Chr coordinates")
-
-
-export <- arrangeGrob(CBFBmap, MYHmap, PMLmap, RARAmap, nrow = 2, ncol = 2)
-
-ggsave("offTargets-1.pdf", export, width = 11, height = 10)
+# RARA = filter(offTarget, Gene == "RARA")
+# RARA$num = 1:nrow(RARA)
+# 
+# CBFB = filter(offTarget, Gene == "CBFB")
+# CBFB$num = 1:nrow(CBFB)
+# 
+# MYH = filter(offTarget, Gene == "MYH11")
+# MYH$num = 1:nrow(MYH)
+# 
+# CBFBmap <- ggplot(data = CBFB) +
+#   geom_point(aes(x = Chr_S, y = num, shape = factor(Date)), size = 3.5, color = "blue") +
+#   geom_point(aes(x = Chr_E, y = num, shape = factor(Date)), size = 3.5, color = "red") +
+#   xlim(c(rois$Start[rois$Gene == "CBFB"], rois$End[rois$Gene == "CBFB"])) +
+#   geom_vline(aes(xintercept = 67111989), linetype = "dashed") +
+#   geom_vline(aes(xintercept = 67111940), linetype = "dashed") +
+#   ggtitle("CBFB off-target cuts") +
+#   scale_shape_manual(values = c(0:2, 4:6, 15)) +
+#   xlab("Chr coordinates")
+# 
+# MYHmap <- ggplot(data = MYH) +
+#   geom_point(aes(x = Chr_S, y = num, shape = factor(Date)), size = 3.5, color = "blue") +
+#   geom_point(aes(x = Chr_E, y = num, shape = factor(Date)), size = 3.5, color = "red") +
+#   xlim(c(rois$Start[rois$Gene == "MYH11"], rois$End[rois$Gene == "MYH11"])) +
+#   geom_vline(aes(xintercept = 15808795), linetype = "dashed") +
+#   geom_vline(aes(xintercept = 15814171), linetype = "dashed") +
+#   geom_vline(aes(xintercept = 15817006), linetype = "dashed") +
+#   geom_vline(aes(xintercept = 15818634), linetype = "dashed") +
+#   ggtitle("MYH off-target cuts") +
+#   scale_shape_manual(values = c(0:2, 4:6, 15)) +
+#   xlab("Chr coordinates")
+# 
+# 
+# PMLmap <- ggplot(data = PML) +
+#   geom_point(aes(x = Chr_S, y = num, shape = factor(Date)), size = 3.5, color = "blue") +
+#   geom_point(aes(x = Chr_E, y = num, shape = factor(Date)), size = 3.5, color = "red") +
+#   xlim(c(rois$Start[rois$Gene == "PML"], rois$End[rois$Gene == "PML"])) +
+#   geom_vline(aes(xintercept = 74322670), linetype = "dashed") +
+#   geom_vline(aes(xintercept = 74305671), linetype = "dashed") +
+#   geom_vline(aes(xintercept = 74324389), linetype = "dashed") +
+#   geom_vline(aes(xintercept = 74304134), linetype = "dashed") +
+#   ggtitle("PML off-target cuts") +
+#   scale_shape_manual(values = c(0:2, 4:6, 15)) +
+#   xlab("Chr coordinates")
+# 
+# RARAmap <- ggplot(data = RARA) +
+#   geom_point(aes(x = Chr_S, y = num, shape = factor(Date)), size = 3.5, color = "blue") +
+#   geom_point(aes(x = Chr_E, y = num, shape = factor(Date)), size = 3.5, color = "red") +
+#   xlim(c(rois$Start[rois$Gene == "RARA"], rois$End[rois$Gene == "RARA"])) +
+#   geom_vline(aes(xintercept = 38505209), linetype = "dashed") +
+#   geom_vline(aes(xintercept = 38511865), linetype = "dashed") +
+#   ggtitle("RARA off-target cuts") +
+#   scale_shape_manual(values = c(0:2, 4:6, 15)) +
+#   xlab("Chr coordinates")
+# 
+# 
+# export <- arrangeGrob(CBFBmap, MYHmap, PMLmap, RARAmap, nrow = 2, ncol = 2)
+# 
+# ggsave("offTargets-1.pdf", export, width = 11, height = 10)
 
 # Karyogram
 lims <- data.frame(paste0("chr", c(1:22, "X", "Y", "M")),
@@ -269,6 +246,9 @@ test$ChrNum <- substring(test$Chr, 4)
 
 test <- filter(test, ChrNum %in% c(1:22))
 
+# This is gonna be a problem later because there are wayyy too many reads per experiment.
+#   Figure out some sort of heatmap scheme...?
+#   Also currently doesn't handle X, Y, M well
 ggplot() +
   geom_segment(data = lims, aes(x = num, xend = num, y = 0, yend = Size),
                color = "lightgray", size = 3) +
@@ -277,176 +257,5 @@ ggplot() +
                                 y = Chr_S, yend = Chr_S), color = "black") +
   coord_flip()
 
-# test3 <- offTarget %>% group_by(Gene, Date) %>% dplyr::summarise(n())
-# test4 <- allData %>% group_by(Date) %>% dplyr::summarise(reads = n(), totLen = sum(Len))
-# test3$reads <- filter(test4, Date %in% test3$Date)$reads
-# 
-# ggplot(test3) + geom_point(aes(x = Date, y = `n()`/reads)) + ylim(c(0, 0.004))
-# 
-# working <- allData %>% filter(Date == 20190501 & Chr == "chr21")
-# 
-# ggplot(working) + geom_histogram(aes(x = Chr_S), bins = 100) + xlim(c(36160098, 37376965))
-
-# By each date, remove 
-
-# working <- rois %>% 
-#   group_by(r=row_number()) %>% 
-#   mutate(custom = list(Start:End)) %>% 
-#   ungroup %>% select(-r) %>% 
-#   unnest()
-# working <- working$custom
-# 
-# working2 <- allData %>% mutate(overlap = ifelse(Chr_S %in% working | Chr_E %in% working, 1, 0))
-# working2 <- working2 %>% filter(overlap == 1)
-
-```
-
-
-```{r All targets}
-subs <- allData %>% filter(Date == 20190326) %>% separate(col = "Chr", into = "chrNum", sep = "r", remove = T)
-
-ggplot() +
-  geom_bar(data = subs, aes(x = Chr, y = Chr_S), stat = "identity") +
-  coord_flip()
-
-```
-
-
-
-```{r CEBPA cuts}
-chr19Cuts <- chr19df %>% filter(Chr == "chr19") %>%
-  mutate(CEBPA1 = ifelse((abs(33786401-Chr_E) < window) |
-                          (abs(33786401-Chr_S) < window), 1, 0)) %>%
-  mutate(CEBPA2 = ifelse((abs(33794671-Chr_E) < window) |
-                          (abs(33794671-Chr_S) < window), 1, 0)) %>%
-  mutate(anyCEBPA = ifelse(CEBPA1 | CEBPA2, 1, 0)) %>%
-  filter(anyCEBPA == 1) %>% select(-Strand, -Score, -anyCEBPA)
-
-cebpaCuts <- melt(chr19Cuts, id = c("Chr", "Chr_S", "Chr_E", "Name")) %>% filter(value == 1) %>%
-  group_by(variable) %>% mutate(Len = Chr_E - Chr_S) %>% summarise(n())
-```
-
-```{r FLT3 cuts}
-chr13Cuts <- chr13df %>% filter(Chr == "chr13") %>%
-  mutate(FLT3F1 = ifelse((abs(28609169-Chr_E) < window) |
-                          (abs(28609169-Chr_S) < window), 1, 0)) %>%
-  mutate(FLT3R1 = ifelse((abs(28591129-Chr_E) < window) |
-                          (abs(28591129-Chr_S) < window), 1, 0)) %>%
-  mutate(FLT3R2 = ifelse((abs(28590244-Chr_E) < window) |
-                          (abs(28590244-Chr_S) < window), 1, 0)) %>%
-  mutate(anyFLT3 = ifelse(FLT3F1 | FLT3R1 | FLT3R2, 1, 0)) %>%
-  filter(anyFLT3 == 1) %>% select(-Strand, -Score, -anyFLT3)
-
-flt3Cuts <- melt(chr13Cuts, id = c("Chr", "Chr_S", "Chr_E", "Name")) %>% filter(value == 1) %>%
-  group_by(variable) %>% mutate(Len = Chr_E - Chr_S) %>% summarise(n())
-
-```
-
-
-```{r Get length of reads with cuts}
-# The next four bits are for the table Olga's using in the abstract
-
-
-# Total number of cuts by guides
-test9 <- df %>% filter(Chr == "chr9") %>%
-  mutate(ABL11 = ifelse((abs(133613086-Chr_E) < window) |
-                          (abs(133613086-Chr_S) < window), 1, 0)) %>%
-  mutate(ABL12 = ifelse((abs(133655785-Chr_E) < window) |
-                          (abs(133655785-Chr_S) < window), 1, 0)) %>%
-  mutate(ABL13 = ifelse((abs(133691503-Chr_E) < window) |
-                          (abs(133691503-Chr_S) < window), 1, 0)) %>%
-  mutate(ABL14 = ifelse((abs(133730289-Chr_E) < window) |
-                          (abs(133730289-Chr_S) < window), 1, 0)) %>%
-  mutate(ABL15 = ifelse((abs(133732446-Chr_E) < window) |
-                          (abs(133732446-Chr_S) < window), 1, 0)) %>%
-  mutate(anyABL = ifelse(ABL11 | ABL12 | ABL13 | ABL14 | ABL15, 1, 0)) %>%
-  filter(anyABL == 1) %>% select(-Strand, -Score, -anyABL)
-
-test9Cuts <- melt(test9, id = c("Chr", "Chr_S", "Chr_E", "Name", "Len")) %>% filter(value != 0) %>%
-  group_by(variable) %>% summarise(n())
-
-test22 <- df %>% filter(Chr == "chr22") %>%
-  mutate(BCR1 = ifelse((abs(23630389-Chr_E) < window) |
-                         (abs(23630389-Chr_S) < window), 1, 0)) %>%
-  mutate(BCR2 = ifelse((abs(23630060-Chr_E) < window) |
-                         (abs(23630060-Chr_S) < window), 1, 0)) %>%
-  mutate(anyBCR = ifelse(BCR1 | BCR2, 1, 0)) %>% filter(anyBCR == 1) %>% select(-Strand, -Score, -anyBCR)
-
-test22Cuts <- melt(chr22Cuts, id = c("Chr", "Chr_S", "Chr_E", "Name", "Len")) %>% filter(value != 0) %>%
-  group_by(variable) %>% summarise(n())
-
-print(paste0("Cuts by guides: ", sum(test9Cuts$`n()`, test22Cuts$`n()`)))
-
-# Reads on target with start at any cut site
-# Rerun above bits, but without "summarise"
-
-print(paste0("On-target, have cut: ", length(unique(c(test9Cuts$Name, test22Cuts$Name)))))
-
-# Reads with chr9 and chr22
-
-print(paste0("On both 9 and 22: ", length(unique(c(chr22Cuts$Name, chr9Cuts$Name)))))
-
-
-
-
-# Other crap
-
-chr9Cuts <- chr9Cuts %>% mutate(Len = Chr_E - Chr_S)
-
-chr22Cuts <- chr22Cuts %>% mutate(Len = Chr_E - Chr_S)
-
-bpOnTarget <- sum(chr9Cuts$Len) + sum(chr22Cuts$Len) + sum(chr13Cuts$Len) + sum(chr19Cuts$Len)
-
-print(paste0("Base Pairs on Target: ", bpOnTarget))
-
-
-
-# KCL22 and KU812
-# allCuts9 <- chr9Cuts %>% select(-ABL11, -ABL12, -ABL13, -ABL14, -ABL15)
-# allCuts22 <- chr22Cuts %>% select(-BCR1, -BCR2)
-
-# K562
-allCuts9 <- chr9Cuts %>% select(-ABL11, -ABL12, -ABL13, -ABL14, -ABL15)
-allCuts22 <- chr22Cuts %>% select(-BCR1, -BCR2)
-
-
-
-
-allCuts <- rbind(allCuts9, allCuts22)
-
-allCuts <- spread(allCuts, key = "Chr", value = "Len") %>%
-      mutate(TotalLen = ifelse(!is.na(chr22), chr22, 0)+ifelse(!is.na(chr9), chr9, 0))
-
-
-# spreadBridging <- bridging %>% filter(Score > 50) %>% select(-Chr_S, -Chr_E, -Score, -Strand)
-
-# spreadBridging <- spreadBridging[c(-157, -266), ]  # Weird ones for KCL22 run
-# spreadBridging <- spreadBridging[-55, ] # Weird one for KU812 run
-# spreadBridging <- spreadBridging[c(-16, -11, -13, -14, -23), ]  # Weird ones for K562 run
-
-# spreadBridging <- spread(spreadBridging, key = "Chr", value = "Len") %>%
-#       mutate(TotalLen = ifelse(!is.na(chr22), chr22, 0)+ifelse(!is.na(chr9), chr9, 0))
-
-bridging <- allCuts %>% group_by(Name) %>% summarise(num = n()) %>% filter(num == 2)
-bridging <- bridging$Name
-
-bridging <- allCuts %>% filter(Name %in% bridging) %>% group_by(Name)
-
-ggplot(subset(bridging, !is.na(chr22))) +
-  geom_histogram(aes(x = Chr_S), fill = "green", alpha = 0.5, bins = 100) +
-  geom_histogram(aes(x = Chr_E), fill = "red", alpha = 0.5, bins = 100)
-
-ggplot(subset(bridging, !is.na(chr9))) +
-  geom_histogram(aes(x = Chr_S), fill = "green", alpha = 0.5, bins = 100) +
-  geom_histogram(aes(x = Chr_E), fill = "red", alpha = 0.5, bins = 100)
-```
-
-
-
-
-```{r Save a CSV of cuts per guide}
-guideTable <- rbind(ablCuts, bcrCuts)
-colnames(guideTable) <- c("Guide", "nCuts")
-write.csv(guideTable, paste0("guideTable_", refmat,".csv"))
 ```
 
