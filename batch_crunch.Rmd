@@ -63,8 +63,8 @@ chrlims <- c(247250000, 242952000, 199502000, 191274000, 180858000,
              170900000, 158822000, 146275000, 140274000, 135375000,
              134453000, 132350000, 114143000, 106369000, 100339000,
              88828000, 78775000, 76118000, 63812000, 62436000,
-             46945000, 49692000, 154914000, 57773000)
-# Last two X, Y.  Need to add M at some point
+             46945000, 49692000, 154914000, 57773000, 16569)
+# Last three X, Y, M.  Need to add M at some point
 
 
 # Length will be important later
@@ -255,6 +255,27 @@ RARAmap <- ggplot(data = RARA) +
 export <- arrangeGrob(CBFBmap, MYHmap, PMLmap, RARAmap, nrow = 2, ncol = 2)
 
 ggsave("offTargets-1.pdf", export, width = 11, height = 10)
+
+# Karyogram
+lims <- data.frame(paste0("chr", c(1:22, "X", "Y", "M")),
+                   chrlims, c(1:22, "X", "Y", "M"), stringsAsFactors = F)
+colnames(lims) <- c("Chr", "Size", "num")
+lims$Chr <- factor(lims$Chr, levels = paste0("chr", c(1:22, "X", "Y", "M")))
+lims$num <- factor(lims$num, levels = c(1:22))
+
+
+test <- filter(allData, Date == 20190823)
+test$ChrNum <- substring(test$Chr, 4)
+
+test <- filter(test, ChrNum %in% c(1:22))
+
+ggplot() +
+  geom_segment(data = lims, aes(x = num, xend = num, y = 0, yend = Size),
+               color = "lightgray", size = 3) +
+  geom_segment(data = test, aes(x = as.integer(ChrNum) - 0.1,
+                                xend = as.integer(ChrNum) + 0.1,
+                                y = Chr_S, yend = Chr_S), color = "black") +
+  coord_flip()
 
 # test3 <- offTarget %>% group_by(Gene, Date) %>% dplyr::summarise(n())
 # test4 <- allData %>% group_by(Date) %>% dplyr::summarise(reads = n(), totLen = sum(Len))
