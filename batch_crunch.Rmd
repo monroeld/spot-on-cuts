@@ -257,5 +257,19 @@ ggplot() +
                                 y = Chr_S, yend = Chr_S), color = "black") +
   coord_flip()
 
+testing <- ggplot() +
+  geom_histogram(data = filter(allData, Chr != "chrM"), aes(x = Chr_S, fill = factor(Date)),
+                 bins = 500, position = "stack") +
+  facet_grid(Chr~.)
+
+
+ggsave("test.pdf", grid.arrange(testing, ncol = 1), height = 49, width = 10)
+
+
+testdf <- sapply(unique(allData$Chr), function(z)
+        hist(allData$Chr_E, plot = F, breaks = 500))
+
+# testing <- lapply(unique(test$Chr), function(x)
+#     s <- density(filter(test, Chr == x)$Chr_S))
 ```
 
